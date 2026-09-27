@@ -29,6 +29,8 @@ on a machine you don't trust yet.
 | AI-agent settings (`.claude/`, `.cursor/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`) that run hooks or **pre-approve shell commands** | | | ✅ |
 
 Results are one of **`clean`**, **`warnings`** (worth a look, often settings) or **`INFECTED`**.
+In a terminal the result is shown as a big colored banner (green, yellow or red). Reports, logs and
+piped output stay plain. Use `NO_COLOR=1` to turn colors off, or `FORCE_COLOR=1` (macOS) / `-Color` (Windows) to force them.
 
 ## Quick start
 
@@ -95,7 +97,7 @@ Fail any pull request that adds the padding trick or a known marker, on any bran
 - uses: actions/checkout@v4
   with:
     fetch-depth: 0
-- uses: SoroushOsivand/stayclean@v0.1.0
+- uses: SoroushOsivand/stayclean@v0.1.1
 ```
 
 ## With Claude Code (or another AI coding agent)

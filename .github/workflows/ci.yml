@@ -50,7 +50,7 @@ jobs:
       - name: Run Windows scanner (clean runner; warnings are fine)
         shell: pwsh
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File windows/stayclean-win.ps1 -Report -ReportDir "$env:RUNNER_TEMP\r"
+          powershell -NoProfile -ExecutionPolicy Bypass -File windows/stayclean-win.ps1 -Color -Report -ReportDir "$env:RUNNER_TEMP\r"
           $code = $LASTEXITCODE
           Get-Content "$env:RUNNER_TEMP\r\*.md"
           if ($code -eq 1) { exit 1 } else { exit 0 }

@@ -21,13 +21,14 @@ param(
   [string]$ReportDir = (Join-Path $env:USERPROFILE ".stayclean\reports"),
   [switch]$Notify,
   [switch]$Quiet,
+  [switch]$Color,
   [switch]$InstallSchedule,
   [switch]$UninstallSchedule,
   [switch]$Version
 )
 
 $ErrorActionPreference = "SilentlyContinue"
-$StayVersion = "0.1.0"
+$StayVersion = "0.1.1"
 $TaskName = "stayclean daily scan"
 if ($Version) { $StayVersion; exit 0 }
 
@@ -114,9 +115,11 @@ foreach ($d in @(
   (Join-Path $env:USERPROFILE ".vscode\extensions"), (Join-Path $env:USERPROFILE ".vscode-insiders\extensions"),
   (Join-Path $env:USERPROFILE ".cursor\extensions"), (Join-Path $env:USERPROFILE ".windsurf\extensions"))) {
   if (-not (Test-Path $d)) { continue }
+  $checked = $true
   $hits = Scan-Dir $d
   if ($hits.Count) { $hits | ForEach-Object { Bad $_ } } else { Ok "clean: $d" }
 }
+if (-not $checked) { Ok "nothing to check (no npx cache or editor extensions yet)" }
 
 Section "Electron apps"
 $asars = @()
@@ -201,7 +204,26 @@ elseif ($nodeDirs.Count -gt 0) { Warn "npm runs install scripts (set: npm config
 if ($script:bad -gt 0) { $result = "INFECTED"; $code = 1 } elseif ($script:warn -gt 0) { $result = "warnings"; $code = 2 } else { $result = "clean"; $code = 0 }
 $summary = "stayclean $($env:COMPUTERNAME): $result ($($script:bad) bad, $($script:warn) warnings) $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 Write-Output ""
-Write-Output "RESULT $result  ($($script:bad) bad, $($script:warn) warnings)"
+# Big block-letter banner, in color, only in an interactive console.
+$color = @{ 0 = "Green"; 1 = "Red"; 2 = "Yellow" }[$code]
+if ($Color -or (-not [Console]::IsOutputRedirected -and -not $env:NO_COLOR)) {
+  $G = @{
+    A = " ### |#   #|#####|#   #|#   #"; C = " ####|#    |#    |#    | ####"; D = "#### |#   #|#   #|#   #|#### "
+    E = "#####|#    |#### |#    |#####"; F = "#####|#    |#### |#    |#    "; G = " ####|#    |#  ##|#   #| ####"
+    I = "#####|  #  |  #  |  #  |#####"; L = "#    |#    |#    |#    |#####"; N = "#   #|##  #|# # #|#  ##|#   #"
+    R = "#### |#   #|#### |#  # |#   #"; S = " ####|#    | ### |    #|#### "; T = "#####|  #  |  #  |  #  |  #  "
+    W = "#   #|#   #|# # #|## ##|#   #"
+  }
+  $word = @{ 0 = "CLEAN"; 1 = "INFECTED"; 2 = "WARNINGS" }[$code]
+  [Console]::OutputEncoding = [Text.Encoding]::UTF8
+  for ($row = 0; $row -lt 5; $row++) {
+    $line = "  " + (($word.ToCharArray() | ForEach-Object { $G["$_"].Split("|")[$row].Replace("#", [string][char]0x2588) }) -join " ")
+    Write-Host $line -ForegroundColor $color
+  }
+  Write-Host "RESULT $result  ($($script:bad) bad, $($script:warn) warnings)" -ForegroundColor $color
+} else {
+  Write-Output "RESULT $result  ($($script:bad) bad, $($script:warn) warnings)"
+}
 if ($code -eq 1) { Write-Output "Stop: don't run npm, node or builds on this machine. See README, 'If it says INFECTED'." }
 
 if ($Report) {

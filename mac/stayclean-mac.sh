@@ -11,7 +11,7 @@
 # Author: Soroush Osivand. MIT License.
 
 set -u
-VERSION="0.1.0"
+VERSION="0.1.1"
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 LABEL="com.github.soroushosivand.stayclean"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
@@ -85,7 +85,46 @@ PAD_RE=' {300,}\S'
 
 # ---------------------------------------------------------------- output
 bad=0; warn=0; LINES=()
-say()  { LINES+=("$1"); [ $QUIET = 1 ] && [ "${1:0:2}" = "ok" ] && return; [ $QUIET = 1 ] && [ "${1:0:2}" = "==" ] && return; echo "$1"; }
+# Colors only in a real terminal (reports, logs and pipes stay plain; NO_COLOR is honored).
+if [ -n "${FORCE_COLOR:-}" ] || { [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != dumb ]; }; then
+  C_OK=$'\033[32m' C_WARN=$'\033[1;33m' C_BAD=$'\033[1;31m' C_HEAD=$'\033[1m' C_DIM=$'\033[2m' C_OFF=$'\033[0m'
+else
+  C_OK="" C_WARN="" C_BAD="" C_HEAD="" C_DIM="" C_OFF=""
+fi
+say()  {
+  LINES+=("$1")
+  case "$1" in
+    ok*) [ $QUIET = 1 ] && return; echo "${C_OK}ok${C_OFF}${1:2}" ;;
+    ==*) [ $QUIET = 1 ] && return; echo "${C_HEAD}$1${C_OFF}" ;;
+    WARN*) echo "${C_WARN}WARN${C_OFF}${1:4}" ;;
+    BAD*) echo "${C_BAD}BAD${C_OFF}${1:3}" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# Big block-letter banner for the result (5 rows per letter).
+glyph() { # glyph <letter> <row 1-5>
+  local g
+  case "$1" in
+    A) g=" ███ |█   █|█████|█   █|█   █" ;; C) g=" ████|█    |█    |█    | ████" ;;
+    D) g="████ |█   █|█   █|█   █|████ " ;; E) g="█████|█    |████ |█    |█████" ;;
+    F) g="█████|█    |████ |█    |█    " ;; G) g=" ████|█    |█  ██|█   █| ████" ;;
+    I) g="█████|  █  |  █  |  █  |█████" ;; L) g="█    |█    |█    |█    |█████" ;;
+    N) g="█   █|██  █|█ █ █|█  ██|█   █" ;; R) g="████ |█   █|████ |█  █ |█   █" ;;
+    S) g=" ████|█    | ███ |    █|████ " ;; T) g="█████|  █  |  █  |  █  |  █  " ;;
+    W) g="█   █|█   █|█ █ █|██ ██|█   █" ;; *) g="     |     |     |     |     " ;;
+  esac
+  echo "$g" | cut -d'|' -f"$2"
+}
+big_banner() { # big_banner <WORD> <color>
+  local row i line
+  echo
+  for row in 1 2 3 4 5; do
+    line="  "
+    for (( i=0; i<${#1}; i++ )); do line="$line$(glyph "${1:$i:1}" "$row") "; done
+    echo "$2$line${C_OFF}"
+  done
+}
 ok()   { say "ok    $*"; }
 warn() { say "WARN  $*"; warn=$((warn+1)); }
 bad()  { say "BAD   $*"; bad=$((bad+1)); }
@@ -118,16 +157,21 @@ for d in ${NODE_DIRS[@]+"${NODE_DIRS[@]}"}; do
   fi
   hits=$(scan_dir "$d")
   if [ -n "$hits" ]; then while read -r h; do bad "global packages: $h"; done <<< "$hits"
-  else ok "global packages clean: $d ($(ls "$d" | wc -l | tr -d ' ') packages: $(ls "$d" | tr '\n' ' '))"; fi
+  else
+    n=$(ls "$d" | wc -l | tr -d ' '); [ "$n" = 1 ] && pk=package || pk=packages
+    ok "global packages clean: $d ($n $pk: $(ls "$d" | tr '\n' ' ' | sed 's/ $//'))"
+  fi
 done
 
 section "npx cache and editor extensions"
 for d in "$HOME/.npm/_npx" "$HOME/.vscode/extensions" "$HOME/.vscode-insiders/extensions" "$HOME/.cursor/extensions" \
          "$HOME/.windsurf/extensions" "$HOME/.vscode-oss/extensions"; do
   [ -d "$d" ] || continue
+  checked=1
   hits=$(scan_dir "$d")
   if [ -n "$hits" ]; then while read -r h; do bad "$h"; done <<< "$hits"; else ok "clean: $d"; fi
 done
+[ -z "${checked:-}" ] && ok "nothing to check (no npx cache or editor extensions yet)"
 
 section "Electron apps in /Applications"
 n=0
@@ -195,8 +239,11 @@ else RESULT="clean"; CODE=0; fi
 HOST=$(scutil --get ComputerName 2>/dev/null || hostname)
 SUMMARY="stayclean $HOST: $RESULT ($bad bad, $warn warnings) $(date '+%Y-%m-%d %H:%M')"
 echo
-echo "RESULT $RESULT  ($bad bad, $warn warnings)"
-[ $CODE = 1 ] && echo "Stop: don't run npm, node or builds on this machine. See README, 'If it says INFECTED'."
+case $CODE in 0) RC=$'\033[1;32m' W=CLEAN ;; 1) RC=$'\033[1;31m' W=INFECTED ;; *) RC=$'\033[1;33m' W=WARNINGS ;; esac
+[ -n "$C_OFF" ] || RC=""
+[ -n "$C_OFF" ] && big_banner "$W" "$RC"
+echo "${RC}RESULT $RESULT  ($bad bad, $warn warnings)${C_OFF}"
+[ $CODE = 1 ] && echo "${C_BAD}Stop: don't run npm, node or builds on this machine. See README, 'If it says INFECTED'.${C_OFF}"
 
 if [ -n "$REPORT_DIR" ]; then
   mkdir -p "$REPORT_DIR"
