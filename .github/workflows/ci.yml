@@ -37,7 +37,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run Mac scanner (clean runner; warnings are fine)
-        run: bash mac/stayclean-mac.sh --report "$RUNNER_TEMP/r"; code=$?; cat "$RUNNER_TEMP"/r/*.md; [ $code -ne 1 ]
+        run: |
+          set +e
+          bash mac/stayclean-mac.sh --report "$RUNNER_TEMP/r"; code=$?
+          cat "$RUNNER_TEMP"/r/*.md
+          [ $code -ne 1 ]
 
   windows:
     runs-on: windows-latest

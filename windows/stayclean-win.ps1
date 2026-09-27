@@ -162,10 +162,13 @@ foreach ($key in @("HKCU:\Software\Microsoft\Windows\CurrentVersion\Run", "HKLM:
     }
   }
 }
+# Windows' own tasks legitimately use cscript/wscript; there, flag only runtimes Windows doesn't ship.
+$nonWindowsRe = '(?i)\b(node|npm|npx|bun|deno)(\.exe|\.cmd)?\b|node_modules|-enc(odedcommand)?\s|mshta|frombase64string|iwr\s|invoke-webrequest|curl\s.*\|'
 foreach ($t in Get-ScheduledTask) {
   if ($t.TaskName -eq $TaskName) { continue }
+  $re = if ($t.TaskPath -like '\Microsoft\Windows\*') { $nonWindowsRe } else { $runtimeRe }
   foreach ($a in $t.Actions) {
-    if ("$($a.Execute) $($a.Arguments)" -match $runtimeRe) { Warn "scheduled task runs a script runtime: $($t.TaskPath)$($t.TaskName): $($a.Execute) $($a.Arguments)" }
+    if ("$($a.Execute) $($a.Arguments)" -match $re) { Warn "scheduled task runs a script runtime: $($t.TaskPath)$($t.TaskName): $($a.Execute) $($a.Arguments)" }
   }
 }
 foreach ($dir in @([Environment]::GetFolderPath("Startup"), [Environment]::GetFolderPath("CommonStartup"))) {
