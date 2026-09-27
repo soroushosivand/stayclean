@@ -131,7 +131,7 @@ foreach ($root in @((Join-Path $env:LOCALAPPDATA "Programs"), $env:ProgramFiles,
 foreach ($a in $asars) {
   if (Select-String -Path $a.FullName -Pattern $Markers -SimpleMatch -List) { Bad "marker in app: $($a.FullName)" }
 }
-Ok "$($asars.Count) Electron apps checked"
+Ok "Electron apps checked: $($asars.Count)"
 
 Section "Hidden malware staging folders in your user folder"
 $staging = Get-ChildItem $env:USERPROFILE -Directory -Force | Where-Object { $_.Name -like ".*" } | ForEach-Object {
@@ -205,6 +205,7 @@ if ($script:bad -gt 0) { $result = "INFECTED"; $code = 1 } elseif ($script:warn 
 $summary = "stayclean $($env:COMPUTERNAME): $result ($($script:bad) bad, $($script:warn) warnings) $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 Write-Output ""
 # Big block-letter banner, in color, only in an interactive console.
+$showBanner = $false
 $color = @{ 0 = "Green"; 1 = "Red"; 2 = "Yellow" }[$code]
 if ($Color -or (-not [Console]::IsOutputRedirected -and -not $env:NO_COLOR)) {
   $G = @{
@@ -215,15 +216,18 @@ if ($Color -or (-not [Console]::IsOutputRedirected -and -not $env:NO_COLOR)) {
     W = "#   #|#   #|# # #|## ##|#   #"
   }
   $word = @{ 0 = "CLEAN"; 1 = "INFECTED"; 2 = "WARNINGS" }[$code]
-  [Console]::OutputEncoding = [Text.Encoding]::UTF8
-  for ($row = 0; $row -lt 5; $row++) {
-    $line = "  " + (($word.ToCharArray() | ForEach-Object { $G["$_"].Split("|")[$row].Replace("#", [string][char]0x2588) }) -join " ")
-    Write-Host $line -ForegroundColor $color
-  }
-  Write-Host "RESULT $result  ($($script:bad) bad, $($script:warn) warnings)" -ForegroundColor $color
-} else {
-  Write-Output "RESULT $result  ($($script:bad) bad, $($script:warn) warnings)"
+  $showBanner = $true
+  # Each risky step is its own try so a console quirk can never hide the RESULT line.
+  try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }
+  try {
+    for ($row = 0; $row -lt 5; $row++) {
+      $line = "  " + (($word.ToCharArray() | ForEach-Object { $G["$_"].Split("|")[$row].Replace("#", [string][char]0x2588) }) -join " ")
+      Write-Host $line -ForegroundColor $color
+    }
+  } catch { }
 }
+$resultLine = "RESULT $result  ($($script:bad) bad, $($script:warn) warnings)"
+if ($showBanner) { Write-Host $resultLine -ForegroundColor $color } else { Write-Output $resultLine }
 if ($code -eq 1) { Write-Output "Stop: don't run npm, node or builds on this machine. See README, 'If it says INFECTED'." }
 
 if ($Report) {

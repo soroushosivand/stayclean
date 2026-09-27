@@ -39,8 +39,10 @@ jobs:
       - name: Run Mac scanner (clean runner; warnings are fine)
         run: |
           set +e
-          bash mac/stayclean-mac.sh --report "$RUNNER_TEMP/r"; code=$?
-          cat "$RUNNER_TEMP"/r/*.md
+          out=$(bash mac/stayclean-mac.sh --report "$RUNNER_TEMP/r"); code=$?
+          echo "$out"; cat "$RUNNER_TEMP"/r/*.md
+          echo "$out" | grep -qE '^RESULT (clean|warnings|INFECTED)' || { echo "RESULT line missing"; exit 1; }
+          FORCE_COLOR=1 bash mac/stayclean-mac.sh | grep -q 'RESULT' || { echo "RESULT line missing with color"; exit 1; }
           [ $code -ne 1 ]
 
   windows:
@@ -50,7 +52,16 @@ jobs:
       - name: Run Windows scanner (clean runner; warnings are fine)
         shell: pwsh
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File windows/stayclean-win.ps1 -Color -Report -ReportDir "$env:RUNNER_TEMP\r"
+          $out = powershell -NoProfile -ExecutionPolicy Bypass -File windows/stayclean-win.ps1 -Report -ReportDir "$env:RUNNER_TEMP\r"
           $code = $LASTEXITCODE
+          $out
           Get-Content "$env:RUNNER_TEMP\r\*.md"
-          if ($code -eq 1) { exit 1 } else { exit 0 }
+          if (-not ($out -match '^RESULT (clean|warnings|INFECTED)')) { Write-Error "RESULT line missing"; exit 1 }
+          if ($code -eq 1) { exit 1 }
+      - name: Banner path must also print RESULT
+        shell: pwsh
+        run: |
+          $all = powershell -NoProfile -ExecutionPolicy Bypass -File windows/stayclean-win.ps1 -Color *>&1 | Out-String
+          $all
+          if ($all -notmatch 'RESULT (clean|warnings|INFECTED)') { Write-Error "RESULT line missing with -Color"; exit 1 }
+          exit 0

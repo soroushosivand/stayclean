@@ -182,7 +182,7 @@ for a in /Applications/*.app "$HOME"/Applications/*.app; do
   hits=$(grep -rlaF "${GREP_M[@]}" "$r/app.asar" "$r/app" 2>/dev/null | head -2)
   [ -n "$hits" ] && while read -r h; do bad "marker in app: $h"; done <<< "$hits"
 done
-ok "$n Electron apps checked"
+ok "Electron apps checked: $n"
 
 section "Hidden malware staging folders in your home folder"
 found=0
