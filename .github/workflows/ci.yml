@@ -58,6 +58,7 @@ jobs:
           Get-Content "$env:RUNNER_TEMP\r\*.md"
           if (-not ($out -match '^RESULT (clean|warnings|INFECTED)')) { Write-Error "RESULT line missing"; exit 1 }
           if ($code -eq 1) { exit 1 }
+          exit 0
       - name: Banner path must also print RESULT
         shell: pwsh
         run: |
