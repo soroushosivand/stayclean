@@ -1,0 +1,52 @@
+name: ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n mac/stayclean-mac.sh && bash -n repo/scan-repo.sh
+      - run: shellcheck -S error mac/stayclean-mac.sh repo/scan-repo.sh
+
+  self-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./
+
+  detects-payload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scanner must flag a planted payload
+        run: |
+          T=$(mktemp -d) && cd "$T" && git init -q -b main
+          { echo "module.exports={}"; printf '%400s' ''; echo "x()"; } > babel.config.js
+          git add . && git -c user.email=ci@x -c user.name=ci commit -qm test
+          if bash "$GITHUB_WORKSPACE/repo/scan-repo.sh" "$T"; then echo "missed the payload"; exit 1; fi
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Mac scanner (clean runner; warnings are fine)
+        run: bash mac/stayclean-mac.sh --report "$RUNNER_TEMP/r"; code=$?; cat "$RUNNER_TEMP"/r/*.md; [ $code -ne 1 ]
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Windows scanner (clean runner; warnings are fine)
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File windows/stayclean-win.ps1 -Report -ReportDir "$env:RUNNER_TEMP\r"
+          $code = $LASTEXITCODE
+          Get-Content "$env:RUNNER_TEMP\r\*.md"
+          if ($code -eq 1) { exit 1 } else { exit 0 }

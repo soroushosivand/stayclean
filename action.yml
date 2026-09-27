@@ -1,0 +1,17 @@
+name: stayclean repo scan
+description: Fail the build if the repo contains known npm backdoor markers or the 300+ space padding trick, on any branch, tag or the stash.
+author: Soroush Osivand
+branding:
+  icon: shield
+  color: green
+inputs:
+  path:
+    description: Repository folder to scan
+    required: false
+    default: "."
+runs:
+  using: composite
+  steps:
+    - name: Scan repository
+      shell: bash
+      run: bash "${{ github.action_path }}/repo/scan-repo.sh" "${{ inputs.path }}"
