@@ -204,10 +204,12 @@ elseif ($nodeDirs.Count -gt 0) { Warn "npm runs install scripts (set: npm config
 if ($script:bad -gt 0) { $result = "INFECTED"; $code = 1 } elseif ($script:warn -gt 0) { $result = "warnings"; $code = 2 } else { $result = "clean"; $code = 0 }
 $summary = "stayclean $($env:COMPUTERNAME): $result ($($script:bad) bad, $($script:warn) warnings) $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 Write-Output ""
-# Big block-letter banner, in color, only in an interactive console.
-$showBanner = $false
-$color = @{ 0 = "Green"; 1 = "Red"; 2 = "Yellow" }[$code]
+# Big block-letter banner in color (ANSI codes on normal output, so it is never lost when the
+# output is captured), only in an interactive console unless -Color is given.
+$esc = [char]27
+$on = ""; $off = ""
 if ($Color -or (-not [Console]::IsOutputRedirected -and -not $env:NO_COLOR)) {
+  $on = "$esc[" + @{ 0 = "1;32"; 1 = "1;31"; 2 = "1;33" }[$code] + "m"; $off = "$esc[0m"
   $G = @{
     A = " ### |#   #|#####|#   #|#   #"; C = " ####|#    |#    |#    | ####"; D = "#### |#   #|#   #|#   #|#### "
     E = "#####|#    |#### |#    |#####"; F = "#####|#    |#### |#    |#    "; G = " ####|#    |#  ##|#   #| ####"
@@ -216,18 +218,16 @@ if ($Color -or (-not [Console]::IsOutputRedirected -and -not $env:NO_COLOR)) {
     W = "#   #|#   #|# # #|## ##|#   #"
   }
   $word = @{ 0 = "CLEAN"; 1 = "INFECTED"; 2 = "WARNINGS" }[$code]
-  $showBanner = $true
   # Each risky step is its own try so a console quirk can never hide the RESULT line.
   try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }
   try {
     for ($row = 0; $row -lt 5; $row++) {
       $line = "  " + (($word.ToCharArray() | ForEach-Object { $G["$_"].Split("|")[$row].Replace("#", [string][char]0x2588) }) -join " ")
-      Write-Host $line -ForegroundColor $color
+      Write-Output "$on$line$off"
     }
   } catch { }
 }
-$resultLine = "RESULT $result  ($($script:bad) bad, $($script:warn) warnings)"
-if ($showBanner) { Write-Host $resultLine -ForegroundColor $color } else { Write-Output $resultLine }
+Write-Output "$($on)RESULT $result  ($($script:bad) bad, $($script:warn) warnings)$off"
 if ($code -eq 1) { Write-Output "Stop: don't run npm, node or builds on this machine. See README, 'If it says INFECTED'." }
 
 if ($Report) {
